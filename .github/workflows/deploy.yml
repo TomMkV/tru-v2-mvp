@@ -1,9 +1,9 @@
 name: Deploy to Lambda GPU
 
 on:
-  push:
-    branches: [ main ]
-  workflow_dispatch:  # Manual trigger
+  # push:
+  #   branches: [ main ]
+  workflow_dispatch:  # Manual trigger only
 
 jobs:
   deploy:
