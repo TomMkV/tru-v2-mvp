@@ -1,0 +1,374 @@
+# TRU Platform v2 - AI Agent Context
+
+## Project Overview
+
+**Purpose**: Production-ready VLM (Vision Language Model) microservice for video analysis using Qwen3-VL.
+
+**Stack**: Python FastAPI + NextJS 14 + Qwen3-VL + Docker + GPU  
+**Status**: ✅ Full-stack MVP complete and deployment-ready  
+**Architecture**: Monorepo with stateless, synchronous processing (serverless-style)
+
+## Repository Structure
+
+```
+tru-v2-mvp/
+├── apps/
+│   ├── inference-api/          # Python FastAPI backend
+│   │   ├── app/
+│   │   │   ├── main.py         # FastAPI app entry (lifespan manager)
+│   │   │   ├── core/
+│   │   │   │   ├── config.py   # Pydantic Settings
+│   │   │   │   └── model.py    # ModelManager class (dual backend)
+│   │   │   ├── api/routes/
+│   │   │   │   ├── inference.py # /v1/inference/* endpoints
+│   │   │   │   └── health.py    # /v1/health endpoints
+│   │   ├── qwen_vl_utils/      # Video processing (from Qwen3-VL repo)
+│   │   ├── requirements.txt
+│   │   ├── Dockerfile
+│   │   └── env.template
+│   └── web/                    # NextJS frontend
+│       ├── app/page.tsx        # Main application
+│       ├── components/         # VideoUploadZone, PromptInput, etc.
+│       ├── lib/api.ts          # Type-safe API client
+│       └── Dockerfile
+├── infrastructure/
+│   ├── docker-compose.yml      # Orchestration
+│   └── test-deployment.sh      # Automated tests
+├── README.md                   # Main documentation
+└── DEPLOYMENT.md               # Production deployment guide
+```
+
+## Critical Architecture Decisions
+
+### 1. Python Backend (NOT Go)
+**Why**: PyTorch, Transformers, vLLM are Python-only. No viable Go alternatives exist for ML inference. FastAPI provides comparable I/O performance (~10-15k req/s), and GPU inference (0.1-10 req/s) is the bottleneck, not the API layer.
+
+### 2. Synchronous Processing (No Queue)
+**Why**: MVP validates core value first. Most videos process in <90s (HTTP can handle). Add Redis/Celery later only if timeouts become common. Current design mimics serverless: stateless, ephemeral, horizontally scalable.
+
+### 3. No Database/Persistence
+**Why**: Stateless architecture. Videos processed and discarded. Add PostgreSQL later only if history/analytics needed based on usage patterns.
+
+### 4. Dual Model Backend
+- **HuggingFace (default)**: Simple setup, good for dev, no extra dependencies
+- **vLLM (optional)**: 2-10x throughput, requires uncommenting in requirements.txt
+
+**Config validation**: Fails fast with clear error if backend misconfigured.
+
+### 5. Extracted qwen-vl-utils
+**Why**: Full control over video processing, can optimise for specific use cases, no dependency on upstream changes. Apache 2.0 licence allows this.
+
+## Key Code Patterns
+
+### Backend Patterns
+
+**1. Lifespan Manager (Model Loading)**
+```python
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load model once on startup (30-120s)
+    model_manager = ModelManager()
+    await model_manager.load_model()
+    app.state.model_manager = model_manager
+    yield
+    await model_manager.cleanup()
+```
+**Why**: Models are 4-235GB. Load once, not per request.
+
+**2. Dual Backend Abstraction**
+```python
+if self.backend == "vllm":
+    return await self._generate_vllm(...)
+else:
+    return await self._generate_hf(...)
+```
+
+**3. Pydantic Everywhere**
+- Request/response validation
+- Config management (BaseSettings)
+- OpenAPI auto-generation
+
+**4. Async/Await Throughout**
+- All routes are async
+- Non-blocking I/O for long-running inference
+
+### Frontend Patterns
+
+**1. Component Composition**
+- `VideoUploadZone`: File handling, drag-drop, validation
+- `PromptInput`: Text input with character counter
+- `ProcessingState`: Loading states with timer
+- `ResultDisplay`: Result visualisation with video playback
+
+**2. Type-Safe API Client**
+- Complete TypeScript interfaces matching backend
+- Upload progress tracking
+- Proper error handling
+
+**3. State Machine**
+```typescript
+type AppState = 'idle' | 'uploading' | 'processing' | 'success' | 'error';
+```
+
+### Infrastructure Patterns
+
+**1. Health Checks**
+```yaml
+healthcheck:
+  start_period: 120s  # Model loading time
+  interval: 30s
+  timeout: 10s
+```
+
+**2. Multi-Stage Docker Builds**
+- Frontend: deps → builder → runner (~200MB final)
+- Backend: CUDA base + Python + dependencies
+
+## Configuration
+
+### Backend (.env)
+```bash
+MODEL_PATH=Qwen/Qwen3-VL-8B-Instruct  # Model variant
+MODEL_BACKEND=hf                       # "hf" or "vllm"
+USE_FLASH_ATTN=true                   # 2-3x speedup
+DEFAULT_VIDEO_FPS=2.0                  # Frame sampling
+DEFAULT_MAX_FRAMES=768                 # Max frames
+MAX_VIDEO_SIZE_MB=1000                # Upload limit
+CORS_ORIGINS=["http://localhost:3000"]
+```
+
+### Frontend
+```bash
+NEXT_PUBLIC_API_URL=http://localhost:8000
+```
+
+## Video Processing Pipeline
+
+```
+Input Video
+    ↓
+Backend Selection (torchcodec > decord > torchvision)
+    ↓
+Frame Extraction
+    ↓
+Smart Sampling (fps-based, default 2.0)
+    ↓
+Smart Resizing (pixel budget: 20480 * 32²)
+    ↓
+Tensor Conversion
+    ↓
+Model Inference
+```
+
+**Key Parameters**:
+- `fps`: Frames per second (default: 2.0)
+- `max_frames`: Maximum frames (default: 768)
+- `min_pixels`: Min resolution per frame (4 * 32²)
+- `max_pixels`: Max resolution per frame (256 * 32²)
+- `total_pixels`: Total pixel budget (20480 * 32²)
+
+## Data Flow
+
+```
+1. User uploads video (frontend)
+2. FormData sent to /v1/inference/upload
+3. Saved to /tmp/tru-v2-uploads/
+4. ModelManager.generate(video, prompt)
+5. qwen_vl_utils processes video (decode, sample, resize)
+6. Model inference (30s-3min)
+7. Temp file cleanup
+8. Return InferenceResponse JSON
+9. Frontend displays result
+```
+
+## Common Tasks
+
+### Add New API Endpoint
+1. Create route in `apps/inference-api/app/api/routes/`
+2. Add Pydantic models for validation
+3. Register router in `main.py`
+4. Update frontend `lib/api.ts` with TypeScript interface
+5. OpenAPI docs auto-update
+
+### Change Model
+```bash
+# In apps/inference-api/.env
+MODEL_PATH=Qwen/Qwen3-VL-4B-Instruct
+# Rebuild: docker-compose up -d --build inference-api
+```
+
+### Enable vLLM
+1. Uncomment `vllm>=0.11.0` in requirements.txt
+2. Set `MODEL_BACKEND=vllm` in .env
+3. Rebuild container
+
+### Test Deployment
+```bash
+cd infrastructure
+./test-deployment.sh  # Automated tests
+docker-compose logs -f  # Monitor
+nvidia-smi  # Check GPU
+```
+
+## Known Issues & Gotchas
+
+1. **Model loading**: First request takes 30-120s. ✅ Fixed with lifespan manager.
+2. **vLLM default**: Changed to `hf` with validation. ✅ Won't fail silently.
+3. **CORS**: Frontend must be in `CORS_ORIGINS` list.
+4. **Long videos**: Can OOM. Use `total_pixels` parameter to cap.
+5. **torchvision <0.19**: No HTTPS support. Use torchcodec (default).
+
+## Performance Expectations
+
+### Latency
+- Short video (<30s): 15-30s
+- Medium (1-2min): 30-90s
+- Long (5min): 2-5min
+- First request: +30-120s (model loading, only once)
+
+### Resource Usage
+- Qwen3-VL-4B: 8-12GB VRAM
+- Qwen3-VL-8B: 16-24GB VRAM
+- Container RAM: 2-4GB (backend), 100-200MB (frontend)
+
+### Optimisations
+- Flash Attention: 2-3x speedup (`USE_FLASH_ATTN=true`)
+- vLLM: 2-10x throughput (batching)
+- Lower FPS: Faster, less detail
+- Smaller model: Qwen3-VL-4B
+
+## Development Workflow
+
+### Local (Docker)
+```bash
+cd infrastructure
+docker-compose up -d
+docker-compose logs -f
+```
+
+### Local (No Docker)
+**Backend**:
+```bash
+cd apps/inference-api
+python3 -m venv venv && source venv/bin/activate
+pip install -r requirements.txt
+cp env.template .env
+uvicorn app.main:app --reload
+```
+
+**Frontend**:
+```bash
+cd apps/web
+npm install
+npm run dev
+```
+
+## Code Conventions
+
+- **Files**: snake_case (`model_manager.py`)
+- **Classes**: PascalCase (`ModelManager`)
+- **Functions**: snake_case (`load_model()`)
+- **Constants**: UPPER_SNAKE_CASE (`MAX_VIDEO_SIZE`)
+- **Private**: Prefix underscore (`_prepare_inputs()`)
+- **Type hints**: Always use them (Python and TypeScript)
+- **Async**: Use async/await for I/O operations
+- **Validation**: Pydantic (backend), Zod (frontend if needed)
+
+## API Endpoints
+
+```
+GET  /v1/health              # Basic health check
+GET  /v1/health/detailed     # Includes GPU and model status
+POST /v1/inference/url       # Process video from URL
+POST /v1/inference/upload    # Process uploaded video
+GET  /docs                   # Swagger UI
+GET  /openapi.json           # OpenAPI schema
+```
+
+## Testing
+
+### Automated
+```bash
+cd infrastructure
+./test-deployment.sh  # Health checks, connectivity
+```
+
+### Manual
+```bash
+# Health
+curl http://localhost:8000/v1/health
+
+# Detailed health
+curl http://localhost:8000/v1/health/detailed | jq
+
+# Test inference
+curl -X POST http://localhost:8000/v1/inference/upload \
+  -F "video=@video.mp4" \
+  -F "prompt=Describe this video"
+
+# Frontend
+open http://localhost:3000
+```
+
+## When to Add Complexity
+
+**Only add these if usage patterns justify**:
+
+- **Async queue (Redis/Celery)**: If >10% requests timeout (>3min)
+- **Database (PostgreSQL)**: If users need history/analytics
+- **Authentication**: If API exposed publicly
+- **Rate limiting**: If abuse becomes an issue
+- **Streaming (WebSocket)**: If users want token-by-token output
+- **Kubernetes**: If need auto-scaling beyond simple horizontal replication
+
+## Deployment
+
+**Development**: `docker-compose up` (single command)  
+**Production**: See DEPLOYMENT.md for Lambda GPU VM setup
+
+**Key requirements**:
+- NVIDIA GPU (16GB+ VRAM for 8B model)
+- Docker + NVIDIA Container Toolkit
+- 32GB+ RAM recommended
+- 50GB+ disk (model cache)
+
+## Quick Reference
+
+**Model loaded?**: `curl localhost:8000/v1/health/detailed | jq '.model.loaded'`  
+**GPU available?**: `curl localhost:8000/v1/health/detailed | jq '.gpu'`  
+**Watch logs**: `docker-compose logs -f`  
+**Check GPU**: `nvidia-smi`  
+**Restart**: `docker-compose restart`  
+**Rebuild**: `docker-compose up -d --build`
+
+## Files to Read First
+
+1. `apps/inference-api/app/main.py` - FastAPI setup
+2. `apps/inference-api/app/core/model.py` - Model management
+3. `apps/inference-api/app/api/routes/inference.py` - API endpoints
+4. `apps/web/app/page.tsx` - Main frontend component
+5. `apps/web/lib/api.ts` - API client
+6. `infrastructure/docker-compose.yml` - Orchestration
+
+## This Codebase is NOT
+
+- ❌ A template or boilerplate
+- ❌ A learning project
+- ❌ Over-engineered for scale
+- ❌ Using trendy tech for its own sake
+
+## This Codebase IS
+
+- ✅ Production-ready MVP
+- ✅ Pragmatic and focused
+- ✅ Stateless and horizontally scalable
+- ✅ Well-documented
+- ✅ Type-safe throughout
+- ✅ Designed for validation first, optimisation later
+
+---
+
+**Last Updated**: October 16, 2025  
+**Status**: Complete and deployment-ready  
+**Next Steps**: Deploy, gather usage data, add features based on real needs
+

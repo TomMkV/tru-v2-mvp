@@ -1,0 +1,38 @@
+name: Deploy to Lambda GPU
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:  # Manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Deploy to Lambda VM
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.LAMBDA_HOST }}
+          username: ${{ secrets.LAMBDA_USER }}
+          key: ${{ secrets.LAMBDA_SSH_KEY }}
+          script: |
+            cd ~/tru-v2-mvp
+            git pull origin main
+            cd infrastructure
+            docker-compose down
+            docker-compose up -d --build
+            sleep 10
+            ./test-deployment.sh
+      
+      - name: Notify success
+        if: success()
+        run: echo "✅ Deployed successfully to Lambda GPU VM"
+      
+      - name: Notify failure
+        if: failure()
+        run: echo "❌ Deployment failed"
+
