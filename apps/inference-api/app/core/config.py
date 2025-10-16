@@ -2,6 +2,7 @@
 Configuration management for the VLM inference service
 """
 import os
+import json
 from typing import List
 from pydantic_settings import BaseSettings
 
@@ -43,8 +44,10 @@ class Settings(BaseSettings):
     ALLOWED_VIDEO_FORMATS: List[str] = [".mp4", ".avi", ".mkv", ".mov", ".webm"]
     UPLOAD_DIR: str = "/tmp/tru-v2-uploads"
     
-    # CORS
-    CORS_ORIGINS: List[str] = ["http://localhost:3000", "http://localhost:3001"]
+    # CORS - Parse from environment or use defaults
+    CORS_ORIGINS: List[str] = json.loads(
+        os.getenv("CORS_ORIGINS", '["http://localhost:3000", "http://localhost:3001"]')
+    )
     
     # Logging
     LOG_LEVEL: str = "INFO"
