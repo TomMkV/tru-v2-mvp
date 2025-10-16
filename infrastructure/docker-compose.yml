@@ -43,8 +43,8 @@ services:
       context: ../apps/web
       dockerfile: Dockerfile
       args:
-        # Use container name for internal communication
-        NEXT_PUBLIC_API_URL: http://inference-api:8000
+        # Not needed - API client uses dynamic hostname detection
+        NEXT_PUBLIC_API_URL: http://localhost:8000
     container_name: tru-v2-web
     ports:
       - "3000:3000"

@@ -28,7 +28,7 @@ export function PromptInput({
         disabled={disabled}
         placeholder={placeholder}
         rows={4}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors resize-none"
+        className="w-full px-4 py-3 text-gray-900 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-100 disabled:cursor-not-allowed transition-colors resize-none"
       />
       <p className="text-xs text-gray-500">
         {value.length} characters

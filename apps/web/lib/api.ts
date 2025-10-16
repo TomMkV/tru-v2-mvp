@@ -5,7 +5,19 @@
  */
 import axios, { AxiosError, AxiosProgressEvent } from 'axios';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Dynamic API URL: Uses same hostname as frontend but port 8000
+// Works with SSH tunnel (localhost:3000 -> localhost:8000)
+// Works with direct access (VM_IP:3000 -> VM_IP:8000)
+const getApiBaseUrl = (): string => {
+  if (typeof window !== 'undefined') {
+    // Browser: use current hostname with port 8000
+    return `${window.location.protocol}//${window.location.hostname}:8000`;
+  }
+  // Server-side rendering: use environment variable or default
+  return process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+};
+
+const API_BASE_URL = getApiBaseUrl();
 
 export interface VideoProcessingParams {
   fps?: number;
