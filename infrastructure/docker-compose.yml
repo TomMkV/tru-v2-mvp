@@ -14,6 +14,7 @@ services:
       - MODEL_BACKEND=${MODEL_BACKEND:-hf}
       - USE_FLASH_ATTN=${USE_FLASH_ATTN:-false}
       - CORS_ORIGINS=${CORS_ORIGINS:-["*"]}
+      - FORCE_QWENVL_VIDEO_READER=${FORCE_QWENVL_VIDEO_READER:-decord}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       # Model cache persistence
