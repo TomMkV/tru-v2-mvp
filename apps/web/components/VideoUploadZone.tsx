@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useState } from 'react';
-import { useDropzone } from 'react-dropzone';
+import { useDropzone, type FileRejection } from 'react-dropzone';
 import { Upload, Video, X, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -19,7 +19,7 @@ export function VideoUploadZone({ onVideoSelect, selectedVideo, onClear, disable
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: Array<{ file: File; errors: Array<{ code: string; message: string }> }>) => {
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: FileRejection[]) => {
     setError(null);
 
     if (rejectedFiles.length > 0) {
