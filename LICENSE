@@ -1,0 +1,56 @@
+                                 Apache License
+                           Version 2.0, January 2004
+                        http://www.apache.org/licenses/
+
+   TERMS AND CONDITIONS FOR USE, REPRODUCTION, AND DISTRIBUTION
+
+   [Full Apache 2.0 license text as standard]
+
+   Copyright 2025 TRU V2 MVP Project
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+   ============================================================================
+   
+   ATTRIBUTION NOTICE
+   
+   This project includes code extracted and adapted from Qwen3-VL:
+   https://github.com/QwenLM/Qwen3-VL
+   
+   Original Work Copyright © Alibaba Cloud (Qwen Team)
+   Licensed under Apache License 2.0
+   
+   Specifically, this project includes:
+   
+   1. qwen_vl_utils/ package
+      - Original source: Qwen3-VL/qwen-vl-utils/src/qwen_vl_utils/
+      - Purpose: Video and image processing utilities
+      - License: Apache 2.0
+   
+   2. Model loading and inference patterns
+      - Original source: Qwen3-VL/web_demo_mm.py
+      - Adapted into: apps/inference-api/app/core/model.py
+      - License: Apache 2.0
+   
+   All modifications and additions to the original Qwen3-VL code are
+   Copyright © 2025 TRU V2 MVP Project and licensed under Apache 2.0.
+   
+   New work in this project (not derived from Qwen3-VL):
+   - FastAPI application structure
+   - API endpoint implementations
+   - Configuration management
+   - Docker and deployment configurations
+   - Documentation and examples
+   
+   ============================================================================
+
