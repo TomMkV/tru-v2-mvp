@@ -12,7 +12,6 @@ interface VideoUploadZoneProps {
   disabled?: boolean;
 }
 
-const ALLOWED_FORMATS = ['video/mp4', 'video/avi', 'video/x-matroska', 'video/quicktime', 'video/webm'];
 const MAX_SIZE_MB = 1000;
 const MAX_SIZE_BYTES = MAX_SIZE_MB * 1024 * 1024;
 
@@ -20,7 +19,7 @@ export function VideoUploadZone({ onVideoSelect, selectedVideo, onClear, disable
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
 
-  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: any[]) => {
+  const onDrop = useCallback((acceptedFiles: File[], rejectedFiles: Array<{ file: File; errors: Array<{ code: string; message: string }> }>) => {
     setError(null);
 
     if (rejectedFiles.length > 0) {

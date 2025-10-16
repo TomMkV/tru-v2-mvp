@@ -93,7 +93,7 @@ export function ProcessingState({ stage, uploadProgress = 0 }: ProcessingStatePr
         {stage === 'processing' && elapsedSeconds > 30 && (
           <p className="mt-4 text-xs text-gray-500 max-w-md">
             VLM processing can take 30s-3min depending on video length. 
-            Please don't close this window.
+            Please don&apos;t close this window.
           </p>
         )}
       </div>

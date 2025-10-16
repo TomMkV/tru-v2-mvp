@@ -53,7 +53,7 @@ export function ResultDisplay({
       <div className="space-y-2">
         <h3 className="text-sm font-medium text-gray-700">Prompt</h3>
         <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
-          <p className="text-gray-700 italic">"{prompt}"</p>
+          <p className="text-gray-700 italic">&ldquo;{prompt}&rdquo;</p>
         </div>
       </div>
 
