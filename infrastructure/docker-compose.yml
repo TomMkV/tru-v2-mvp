@@ -13,7 +13,7 @@ services:
       - MODEL_PATH=${MODEL_PATH:-Qwen/Qwen3-VL-8B-Instruct}
       - MODEL_BACKEND=${MODEL_BACKEND:-hf}
       - USE_FLASH_ATTN=${USE_FLASH_ATTN:-false}
-      - CORS_ORIGINS=["http://localhost:3000","http://web:3000"]
+      - CORS_ORIGINS=${CORS_ORIGINS:-["*"]}
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
       # Model cache persistence
