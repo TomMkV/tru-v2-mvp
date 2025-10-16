@@ -281,7 +281,7 @@ class ModelManager:
         # Decode
         generated_ids = [
             output_ids[len(input_ids):]
-            for input_ids, output_ids in zip(inputs.input_ids, output_ids)
+            for input_ids, output_ids in zip(inputs["input_ids"], output_ids)
         ]
         
         output_text = self.processor.batch_decode(
