@@ -1,102 +1,216 @@
-import Image from "next/image";
+'use client';
+
+import { useState } from 'react';
+import { VideoUploadZone } from '@/components/VideoUploadZone';
+import { PromptInput } from '@/components/PromptInput';
+import { ProcessingState } from '@/components/ProcessingState';
+import { ResultDisplay } from '@/components/ResultDisplay';
+import { apiClient, InferenceResponse, ApiError } from '@/lib/api';
+import { AlertCircle, PlayCircle, RotateCcw } from 'lucide-react';
+
+type AppState = 'idle' | 'uploading' | 'processing' | 'success' | 'error';
 
 export default function Home() {
-  return (
-    <div className="font-sans grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="font-mono list-inside list-decimal text-sm/6 text-center sm:text-left">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] font-mono font-semibold px-1 py-0.5 rounded">
-              app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  const [state, setState] = useState<AppState>('idle');
+  const [selectedVideo, setSelectedVideo] = useState<File | null>(null);
+  const [videoPreviewUrl, setVideoPreviewUrl] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<string>('');
+  const [uploadProgress, setUploadProgress] = useState<number>(0);
+  const [result, setResult] = useState<InferenceResponse | null>(null);
+  const [error, setError] = useState<ApiError | null>(null);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  const handleVideoSelect = (file: File) => {
+    setSelectedVideo(file);
+    // Create preview URL for result display
+    const url = URL.createObjectURL(file);
+    setVideoPreviewUrl(url);
+    setError(null);
+  };
+
+  const handleClearVideo = () => {
+    if (videoPreviewUrl) {
+      URL.revokeObjectURL(videoPreviewUrl);
+    }
+    setSelectedVideo(null);
+    setVideoPreviewUrl(null);
+    setError(null);
+  };
+
+  const handleSubmit = async () => {
+    if (!selectedVideo || !prompt.trim()) {
+      setError({
+        message: 'Please select a video and enter a prompt',
+      });
+      return;
+    }
+
+    try {
+      setState('uploading');
+      setError(null);
+      setResult(null);
+
+      const response = await apiClient.inferenceFromUpload(
+        selectedVideo,
+        prompt,
+        undefined, // Use default video params
+        undefined, // Use default generation params
+        (progress) => {
+          setUploadProgress(progress);
+          // Transition to processing once upload is complete
+          if (progress === 100) {
+            setState('processing');
+          }
+        }
+      );
+
+      setState('success');
+      setResult(response);
+    } catch (err) {
+      setState('error');
+      setError(err as ApiError);
+    }
+  };
+
+  const handleReset = () => {
+    setState('idle');
+    handleClearVideo();
+    setPrompt('');
+    setResult(null);
+    setError(null);
+    setUploadProgress(0);
+  };
+
+  const canSubmit = selectedVideo && prompt.trim().length > 0 && state === 'idle';
+  const isProcessing = state === 'uploading' || state === 'processing';
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-gray-50 to-gray-100">
+      {/* Header */}
+      <header className="bg-white border-b border-gray-200 shadow-sm">
+        <div className="max-w-5xl mx-auto px-6 py-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-blue-600 rounded-lg">
+              <PlayCircle className="w-6 h-6 text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">TRU Platform v2</h1>
+              <p className="text-sm text-gray-600">Vision Language Model Analysis</p>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-5xl mx-auto px-6 py-8">
+        <div className="space-y-6">
+          {/* Input Section */}
+          {(state === 'idle' || state === 'uploading' || state === 'processing') && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8 space-y-6">
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-2">
+                  Upload Video
+                </h2>
+                <p className="text-sm text-gray-600 mb-4">
+                  Select a video file to analyze with the vision language model
+                </p>
+                <VideoUploadZone
+                  onVideoSelect={handleVideoSelect}
+                  selectedVideo={selectedVideo}
+                  onClear={handleClearVideo}
+                  disabled={isProcessing}
+                />
+              </div>
+
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">
+                  Enter Prompt
+                </h2>
+                <PromptInput
+                  value={prompt}
+                  onChange={setPrompt}
+                  disabled={isProcessing}
+                  placeholder="What is happening in this video? Describe the scene, actions, and any notable details..."
+                />
+              </div>
+
+              {!isProcessing && (
+                <button
+                  onClick={handleSubmit}
+                  disabled={!canSubmit}
+                  className="w-full flex items-center justify-center gap-2 px-6 py-4 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors shadow-lg hover:shadow-xl"
+                >
+                  <PlayCircle className="w-5 h-5" />
+                  Process Video
+                </button>
+              )}
+            </div>
+          )}
+
+          {/* Processing State */}
+          {isProcessing && (
+            <ProcessingState
+              stage={state === 'uploading' ? 'uploading' : 'processing'}
+              uploadProgress={uploadProgress}
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
+          )}
+
+          {/* Error Display */}
+          {state === 'error' && error && (
+            <div className="bg-white rounded-xl shadow-sm border border-red-200 p-8">
+              <div className="flex items-start gap-4">
+                <div className="p-3 bg-red-100 rounded-full">
+                  <AlertCircle className="w-6 h-6 text-red-600" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">
+                    Processing Failed
+                  </h3>
+                  <p className="text-gray-700 mb-4">{error.message}</p>
+                  {error.detail && (
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded border border-gray-200">
+                      {error.detail}
+                    </p>
+                  )}
+                  <button
+                    onClick={handleReset}
+                    className="mt-4 flex items-center gap-2 px-4 py-2 bg-gray-900 text-white rounded-lg hover:bg-gray-800 transition-colors"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                    Try Again
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Success Result */}
+          {state === 'success' && result && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+              <ResultDisplay
+                response={result.response}
+                prompt={result.prompt}
+                videoSource={result.video_source}
+                backend={result.backend}
+                videoUrl={videoPreviewUrl || undefined}
+              />
+              
+              <button
+                onClick={handleReset}
+                className="mt-6 w-full flex items-center justify-center gap-2 px-6 py-3 bg-gray-900 text-white font-semibold rounded-lg hover:bg-gray-800 transition-colors"
+              >
+                <RotateCcw className="w-5 h-5" />
+                Analyze Another Video
+              </button>
+            </div>
+          )}
         </div>
       </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
+
+      {/* Footer */}
+      <footer className="max-w-5xl mx-auto px-6 py-8 mt-12 text-center text-sm text-gray-500">
+        <p>
+          Powered by Qwen3-VL • FastAPI • NextJS
+        </p>
       </footer>
     </div>
   );

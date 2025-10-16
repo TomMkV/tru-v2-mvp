@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # FastAPI Backend - VLM Inference Service
   inference-api:
     build:
       context: ../apps/inference-api
@@ -12,10 +13,13 @@ services:
       - MODEL_PATH=${MODEL_PATH:-Qwen/Qwen3-VL-8B-Instruct}
       - MODEL_BACKEND=${MODEL_BACKEND:-hf}
       - USE_FLASH_ATTN=${USE_FLASH_ATTN:-false}
-      - CORS_ORIGINS=["http://localhost:3000"]
+      - CORS_ORIGINS=["http://localhost:3000","http://web:3000"]
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
     volumes:
+      # Model cache persistence
       - model-cache:/root/.cache/huggingface
-      - ../apps/inference-api/app:/app/app  # Mount for hot-reload during development
+      # Hot-reload for development (comment out for production)
+      - ../apps/inference-api/app:/app/app
     deploy:
       resources:
         reservations:
@@ -30,23 +34,40 @@ services:
       timeout: 10s
       retries: 3
       start_period: 120s
+    networks:
+      - tru-network
 
-  # Placeholder for NextJS frontend
+  # NextJS Frontend
   web:
-    image: node:20-alpine
+    build:
+      context: ../apps/web
+      dockerfile: Dockerfile
+      args:
+        # Use container name for internal communication
+        NEXT_PUBLIC_API_URL: http://inference-api:8000
     container_name: tru-v2-web
-    working_dir: /app
-    command: sh -c "echo 'NextJS frontend placeholder - to be implemented' && tail -f /dev/null"
     ports:
       - "3000:3000"
-    volumes:
-      - ../apps/web:/app
     environment:
-      - NEXT_PUBLIC_API_URL=http://inference-api:8000
+      # Override at runtime for browser-side API calls
+      - NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL:-http://localhost:8000}
     depends_on:
-      - inference-api
+      inference-api:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - tru-network
 
 volumes:
   model-cache:
     driver: local
 
+networks:
+  tru-network:
+    driver: bridge
