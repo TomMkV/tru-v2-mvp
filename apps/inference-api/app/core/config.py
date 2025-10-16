@@ -16,7 +16,7 @@ class Settings(BaseSettings):
     
     # Model configuration
     MODEL_PATH: str = os.getenv("MODEL_PATH", "Qwen/Qwen3-VL-8B-Instruct")
-    MODEL_BACKEND: str = os.getenv("MODEL_BACKEND", "vllm")  # "vllm" or "hf"
+    MODEL_BACKEND: str = os.getenv("MODEL_BACKEND", "hf")  # "vllm" or "hf"
     DEVICE_MAP: str = "auto"
     USE_FLASH_ATTN: bool = True
     

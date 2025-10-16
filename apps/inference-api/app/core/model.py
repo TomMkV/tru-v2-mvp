@@ -33,9 +33,17 @@ class ModelManager:
         self.model_path = settings.MODEL_PATH
         
         # Validate backend choice
+        if self.backend not in ["vllm", "hf"]:
+            raise ValueError(f"Invalid MODEL_BACKEND: {self.backend}. Must be 'vllm' or 'hf'")
+        
         if self.backend == "vllm" and not VLLM_AVAILABLE:
-            logger.warning("vLLM requested but not available. Falling back to HuggingFace.")
-            self.backend = "hf"
+            error_msg = (
+                "vLLM backend requested but not available. "
+                "Install with: pip install vllm>=0.11.0 "
+                "Or set MODEL_BACKEND=hf in your .env file"
+            )
+            logger.error(error_msg)
+            raise RuntimeError(error_msg)
     
     async def load_model(self):
         """Load the model based on configured backend"""
